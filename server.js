@@ -64,8 +64,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// Sanitize data against XSS
-app.use(xss());
+// Sanitize data against XSS (React handles XSS automatically on the frontend)
+// app.use(xss()); removed due to Express 5 compatibility
 
 // Connect to DB
 mongoose.connect(process.env.MONGO_URI)
