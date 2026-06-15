@@ -28,9 +28,21 @@ app.use(express.json({ limit: '10kb' })); // Prevent DOS by limiting body payloa
 app.use(cookieParser());
 
 // Enable CORS with credentials for specific frontend origin
-const allowedOrigin = process.env.CLIENT_URL || 'https://tyreshop-client.vercel.app';
+const allowedOrigins = [
+  process.env.CLIENT_URL,
+  'https://tyreshop-client.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:5174'
+].filter(Boolean);
+
 app.use(cors({
-  origin: allowedOrigin, 
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  }, 
   credentials: true
 }));
 
