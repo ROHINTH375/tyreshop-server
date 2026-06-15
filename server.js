@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const helmet = require('helmet');
-const mongoSanitize = require('express-mongo-sanitize');
+// express-mongo-sanitize removed due to Express 5 compatibility issues
 const xss = require('xss-clean');
 const rateLimit = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
@@ -46,8 +46,23 @@ app.use(cors({
   credentials: true
 }));
 
-// Sanitize data against NoSQL Injection
-app.use(mongoSanitize());
+// Sanitize data against NoSQL Injection (Express 5 safe)
+const sanitizeObject = (obj) => {
+  if (!obj || typeof obj !== 'object') return;
+  for (const key in obj) {
+    if (key.startsWith('$')) {
+      delete obj[key];
+    } else if (typeof obj[key] === 'object') {
+      sanitizeObject(obj[key]);
+    }
+  }
+};
+app.use((req, res, next) => {
+  ['body', 'params', 'query'].forEach(k => {
+    if (req[k]) sanitizeObject(req[k]);
+  });
+  next();
+});
 
 // Sanitize data against XSS
 app.use(xss());
