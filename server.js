@@ -41,7 +41,8 @@ app.use(cors({
       !origin || 
       allowedOrigins.includes(origin) || 
       (origin && origin.startsWith('http://localhost')) ||
-      (origin && origin.startsWith('http://127.0.0.1'))
+      (origin && origin.startsWith('http://127.0.0.1')) ||
+      (origin && origin.endsWith('vercel.app'))
     ) {
       callback(null, true);
     } else {
