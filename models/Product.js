@@ -7,6 +7,8 @@ const ProductSchema = new mongoose.Schema({
   compatibility: { type: [String], required: true }, // e.g., ['Honda Activa', 'TVS Jupiter']
   brand: { type: String, required: true },
   price: { type: Number, required: true },
+  studentPrice: { type: Number },
+  mechanicPrice: { type: Number },
   stockQuantity: { type: Number, required: true, default: 0 },
   imageUrl: { type: String, required: true },
   gallery: { type: [String], default: [] },

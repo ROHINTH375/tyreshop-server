@@ -118,7 +118,7 @@ router.post('/:id/reviews', auth, async (req, res) => {
 
     const review = {
       user: req.user.id,
-      name: userObj.name,
+      name: `${userObj.firstName} ${userObj.lastName}`,
       rating: Number(rating),
       comment
     };

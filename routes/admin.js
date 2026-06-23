@@ -105,6 +105,43 @@ router.get('/export/users', [auth, admin], async (req, res) => {
   }
 });
 
+// @route   GET api/admin/export/orders
+// @desc    Export orders to CSV
+// @access  Private/Admin
+router.get('/export/orders', [auth, admin], async (req, res) => {
+  try {
+    const Order = require('../models/Order'); // Local require to avoid circular deps if any
+    const orders = await Order.find().populate('user', ['name', 'email']).populate('items.product');
+    
+    let csv = 'OrderID,CustomerName,CustomerEmail,TotalAmount,Status,TransactionID,CreatedAt,Items\n';
+    
+    orders.forEach(o => {
+      const cName = `"${o.user?.name || 'Unknown'}"`;
+      const cEmail = `"${o.user?.email || 'Unknown'}"`;
+      const status = `"${o.status}"`;
+      const tId = `"${o.transactionId || ''}"`;
+      const date = `"${o.createdAt}"`;
+      
+      // Formatting items nicely
+      const itemsStr = o.items.map(i => {
+        const pName = i.product ? i.product.name : 'Unknown Product';
+        return `${pName} (Qty: ${i.quantity})`;
+      }).join(' | ');
+      
+      const itemsCSV = `"${itemsStr}"`;
+      
+      csv += `${o._id},${cName},${cEmail},${o.totalAmount},${status},${tId},${date},${itemsCSV}\n`;
+    });
+    
+    res.header('Content-Type', 'text/csv');
+    res.attachment('orders.csv');
+    return res.send(csv);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server error');
+  }
+});
+
 // @route   POST api/admin/products/bulk
 // @desc    Bulk upload products via JSON array (from CSV)
 // @access  Private/Admin
@@ -145,6 +182,96 @@ router.post('/products/bulk', [auth, admin], async (req, res) => {
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error during bulk upload');
+  }
+});
+
+// @route   GET api/admin/student-verifications
+// @desc    Get all pending student verifications
+// @access  Private/Admin
+router.get('/student-verifications', [auth, admin], async (req, res) => {
+  try {
+    const users = await User.find({ studentStatus: 'pending' }).select('-password');
+    res.json(users);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server error');
+  }
+});
+
+// @route   PUT api/admin/student-verify/:id
+// @desc    Approve or reject student verification
+// @access  Private/Admin
+router.put('/student-verify/:id', [auth, admin], async (req, res) => {
+  const { status } = req.body; // 'verified' or 'rejected'
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { $set: { studentStatus: status } },
+      { new: true }
+    ).select('-password');
+    
+    res.json(user);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server error');
+  }
+});
+
+// @route   GET api/admin/coupons
+// @desc    Get all coupons
+// @access  Private/Admin
+router.get('/coupons', [auth, admin], async (req, res) => {
+  try {
+    const coupons = await require('../models/Coupon').find().sort({ createdAt: -1 });
+    res.json(coupons);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server error');
+  }
+});
+
+// @route   POST api/admin/coupons
+// @desc    Create a new coupon
+// @access  Private/Admin
+router.post('/coupons', [auth, admin], async (req, res) => {
+  try {
+    const newCoupon = new (require('../models/Coupon'))(req.body);
+    const coupon = await newCoupon.save();
+    res.json(coupon);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server error');
+  }
+});
+
+// @route   DELETE api/admin/coupons/:id
+// @desc    Delete a coupon
+// @access  Private/Admin
+router.delete('/coupons/:id', [auth, admin], async (req, res) => {
+  try {
+    await require('../models/Coupon').findByIdAndDelete(req.params.id);
+    res.json({ msg: 'Coupon removed' });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server error');
+  }
+});
+
+// @route   PUT api/admin/orders/:id/tracking
+// @desc    Update order tracking information
+// @access  Private/Admin
+router.put('/orders/:id/tracking', [auth, admin], async (req, res) => {
+  const { courierName, trackingNumber, estimatedDeliveryDate } = req.body;
+  try {
+    const order = await Order.findByIdAndUpdate(
+      req.params.id,
+      { $set: { courierName, trackingNumber, estimatedDeliveryDate, status: 'Shipped' } },
+      { new: true }
+    );
+    res.json(order);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server error');
   }
 });
 
