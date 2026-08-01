@@ -12,10 +12,14 @@ const OrderSchema = new mongoose.Schema({
   totalAmount: { type: Number, required: true },
   shippingAddress: { type: String, required: true },
   transactionId: { type: String, required: true },
-  status: { type: String, default: 'Pending' }, // 'Pending', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered'
+  status: { type: String, default: 'Pending' }, // 'Pending', 'Processing', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled'
   courierName: { type: String },
   trackingNumber: { type: String },
-  estimatedDeliveryDate: { type: Date }
+  estimatedDeliveryDate: { type: Date },
+  returnStatus: { type: String, enum: ['None', 'Requested', 'Approved', 'Rejected', 'Refunded'], default: 'None' },
+  returnReason: { type: String },
+  returnRequestedAt: { type: Date },
+  returnResolvedAt: { type: Date }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Order', OrderSchema);

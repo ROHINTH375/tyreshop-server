@@ -176,9 +176,82 @@ router.put('/:id/status', [auth, admin], async (req, res) => {
       { $set: { status } },
       { new: true }
     ).populate('user', ['name', 'email']).populate('items.product');
-    
+
     if (!order) return res.status(404).json({ msg: 'Order not found' });
     res.json(order);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server error');
+  }
+});
+
+// @route   POST api/orders/:id/return
+// @desc    Customer requests a return on their own delivered order
+// @access  Private
+router.post('/:id/return', auth, async (req, res) => {
+  try {
+    const { reason } = req.body;
+    const order = await Order.findById(req.params.id);
+
+    if (!order) return res.status(404).json({ msg: 'Order not found' });
+    if (order.user.toString() !== req.user.id) {
+      return res.status(403).json({ msg: 'Not authorized to modify this order' });
+    }
+    if (order.status !== 'Delivered') {
+      return res.status(400).json({ msg: 'Only delivered orders can be returned' });
+    }
+    if (order.returnStatus !== 'None') {
+      return res.status(400).json({ msg: 'A return has already been requested for this order' });
+    }
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ msg: 'A reason is required to request a return' });
+    }
+
+    order.returnStatus = 'Requested';
+    order.returnReason = reason.trim();
+    order.returnRequestedAt = new Date();
+    await order.save();
+
+    res.json(order);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server error');
+  }
+});
+
+// @route   PUT api/orders/:id/return
+// @desc    Admin resolves a return request (approve restocks items, reject or refund don't)
+// @access  Private/Admin
+router.put('/:id/return', [auth, admin], async (req, res) => {
+  try {
+    const { returnStatus } = req.body;
+    const validTransitions = {
+      Requested: ['Approved', 'Rejected'],
+      Approved: ['Refunded']
+    };
+
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ msg: 'Order not found' });
+
+    const allowedNext = validTransitions[order.returnStatus] || [];
+    if (!allowedNext.includes(returnStatus)) {
+      return res.status(400).json({ msg: `Cannot move return from '${order.returnStatus}' to '${returnStatus}'` });
+    }
+
+    if (returnStatus === 'Approved') {
+      for (const item of order.items) {
+        await Product.findByIdAndUpdate(item.product, { $inc: { stockQuantity: item.quantity } });
+      }
+    }
+
+    order.returnStatus = returnStatus;
+    if (returnStatus === 'Rejected' || returnStatus === 'Refunded') {
+      order.returnResolvedAt = new Date();
+    }
+    await order.save();
+
+    const populated = await Order.findById(order._id).populate('user', ['name', 'email']).populate('items.product');
+    res.json(populated);
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');

@@ -7,12 +7,67 @@ const auth = require('../middleware/auth');
 const admin = require('../middleware/admin');
 
 // @route   GET api/products
-// @desc    Get all products
+// @desc    Get products. Supports optional search/brand/category/sort filters.
+//          Passing page/limit switches the response to a paginated shape
+//          ({ products, page, totalPages, total }) instead of a plain array,
+//          so existing callers that want the full catalog keep working unchanged.
 // @access  Public
 router.get('/', async (req, res) => {
   try {
-    const products = await Product.find();
-    res.json(products);
+    const { search, brand, category, sort, page, limit } = req.query;
+    const query = {};
+
+    if (search) {
+      const re = new RegExp(String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      query.$or = [{ name: re }, { brand: re }, { type: re }, { keywords: re }];
+    }
+
+    if (brand) {
+      const brands = String(brand).split(',').map(b => b.trim()).filter(Boolean);
+      if (brands.length) query.brand = { $in: brands };
+    }
+
+    if (category) {
+      const categories = String(category).split(',').map(c => c.trim()).filter(Boolean);
+      if (categories.length) query.type = { $in: categories.map(c => new RegExp(c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')) };
+    }
+
+    let sortOption = {};
+    if (sort === 'lowToHigh') sortOption = { price: 1 };
+    else if (sort === 'highToLow') sortOption = { price: -1 };
+
+    if (!page && !limit) {
+      const products = await Product.find(query).sort(sortOption);
+      return res.json(products);
+    }
+
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(60, Math.max(1, parseInt(limit, 10) || 12));
+
+    const [products, total] = await Promise.all([
+      Product.find(query).sort(sortOption).skip((pageNum - 1) * limitNum).limit(limitNum),
+      Product.countDocuments(query)
+    ]);
+
+    res.json({
+      products,
+      page: pageNum,
+      totalPages: Math.max(1, Math.ceil(total / limitNum)),
+      total
+    });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server error');
+  }
+});
+
+// @route   GET api/products/meta/brands
+// @desc    Distinct brand list for filter sidebars (independent of pagination/filters)
+// @access  Public
+router.get('/meta/brands', async (req, res) => {
+  try {
+    const brands = await Product.distinct('brand');
+    res.json(brands.filter(Boolean).sort());
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');
