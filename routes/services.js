@@ -23,7 +23,8 @@ router.put('/mechanic/profile', auth, async (req, res) => {
     };
     
     await user.save();
-    res.json({ msg: 'Profile updated successfully', user });
+    const safeUser = await User.findById(user.id).select('-password');
+    res.json({ msg: 'Profile updated successfully', user: safeUser });
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');

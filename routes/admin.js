@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const Product = require('../models/Product');
+const Order = require('../models/Order');
 const auth = require('../middleware/auth');
 const admin = require('../middleware/admin');
 
@@ -110,7 +111,6 @@ router.get('/export/users', [auth, admin], async (req, res) => {
 // @access  Private/Admin
 router.get('/export/orders', [auth, admin], async (req, res) => {
   try {
-    const Order = require('../models/Order'); // Local require to avoid circular deps if any
     const orders = await Order.find().populate('user', ['name', 'email']).populate('items.product');
     
     let csv = 'OrderID,CustomerName,CustomerEmail,TotalAmount,Status,TransactionID,CreatedAt,Items\n';

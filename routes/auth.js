@@ -164,7 +164,8 @@ router.put('/user', auth, async (req, res) => {
     if (phone !== undefined) user.phone = phone;
 
     await user.save();
-    res.json(user);
+    const safeUser = await User.findById(user.id).select('-password');
+    res.json(safeUser);
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');
@@ -319,7 +320,8 @@ router.post('/student-verify', auth, async (req, res) => {
     user.studentStatus = 'pending';
 
     await user.save();
-    res.json({ msg: 'Verification details submitted successfully. Waiting for admin approval.', user });
+    const safeUser = await User.findById(user.id).select('-password');
+    res.json({ msg: 'Verification details submitted successfully. Waiting for admin approval.', user: safeUser });
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');
